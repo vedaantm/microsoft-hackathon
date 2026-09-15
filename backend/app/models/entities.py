@@ -117,7 +117,9 @@ class MemberSubscription(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     member_id: Mapped[int] = mapped_column(ForeignKey("members.id"), nullable=False)
     apim_subscription_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    subscription_display_name: Mapped[str | None] = mapped_column(String(200))
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    last_rotated_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     member: Mapped[Member] = relationship(back_populates="subscriptions")
