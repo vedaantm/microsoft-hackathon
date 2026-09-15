@@ -29,8 +29,13 @@ def phase4_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             session.close()
 
     monkeypatch.setattr(main, "telemetry_provider", SeedTelemetryProvider(factory))
+    monkeypatch.setenv("AUTH_MODE", "development")
     main.app.dependency_overrides[get_db] = override_get_db
     with TestClient(main.app) as client:
+        login = client.post(
+            "/api/v1/auth/dev-login", json={"identifier": "avery.quinn@example.test"}
+        )
+        assert login.status_code == 200, login.text
         yield client, factory
     main.app.dependency_overrides.clear()
 

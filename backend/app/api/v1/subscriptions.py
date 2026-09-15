@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.api.v1.auth import Identity, ensure_scope, require_role
 from app.api.v1.common import commit, get_db, get_or_404
 from app.models import Member, MemberSubscription
 from app.schemas import SubscriptionPatch, SubscriptionRead, SubscriptionUpdate
 
 router = APIRouter()
-# TODO(Phase 5): enforce role-based authorization
 
 
 def public_subscription(subscription: MemberSubscription) -> dict:
@@ -19,7 +19,12 @@ def public_subscription(subscription: MemberSubscription) -> dict:
 
 
 @router.get("/members/{member_id}/subscription", response_model=SubscriptionRead)
-def get_subscription(member_id: int, db: Session = Depends(get_db)) -> dict:
+def get_subscription(
+    member_id: int,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
+) -> dict:
+    ensure_scope(identity, db, member_id=member_id)
     get_or_404(db, Member, member_id)
     subscription = (
         db.query(MemberSubscription)
@@ -41,8 +46,12 @@ def get_subscription(member_id: int, db: Session = Depends(get_db)) -> dict:
 
 @router.put("/members/{member_id}/subscription", response_model=SubscriptionRead)
 def put_subscription(
-    member_id: int, payload: SubscriptionUpdate, db: Session = Depends(get_db)
+    member_id: int,
+    payload: SubscriptionUpdate,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
 ) -> dict:
+    ensure_scope(identity, db, member_id=member_id)
     get_or_404(db, Member, member_id)
     subscription = (
         db.query(MemberSubscription)
@@ -64,9 +73,13 @@ def put_subscription(
 
 @router.patch("/subscriptions/{subscription_id}", response_model=SubscriptionRead)
 def patch_subscription(
-    subscription_id: int, payload: SubscriptionPatch, db: Session = Depends(get_db)
+    subscription_id: int,
+    payload: SubscriptionPatch,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
 ) -> dict:
     subscription = get_or_404(db, MemberSubscription, subscription_id)
+    ensure_scope(identity, db, member_id=subscription.member_id)
     values = payload.model_dump(exclude_unset=True)
     for key, value in values.items():
         setattr(subscription, key, value)
@@ -76,7 +89,12 @@ def patch_subscription(
 
 
 @router.delete("/subscriptions/{subscription_id}", status_code=204)
-def delete_subscription(subscription_id: int, db: Session = Depends(get_db)) -> None:
+def delete_subscription(
+    subscription_id: int,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
+) -> None:
     subscription = get_or_404(db, MemberSubscription, subscription_id)
+    ensure_scope(identity, db, member_id=subscription.member_id)
     db.delete(subscription)
     commit(db)

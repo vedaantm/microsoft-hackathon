@@ -5,6 +5,7 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.api.v1.auth import Identity, require_role, scoped_filters
 from app.api.v1.common import get_db, page_params
 from app.models import ModelConfiguration
 from app.schemas import (
@@ -20,7 +21,6 @@ from app.schemas import (
 from app.telemetry import TelemetryFilters
 
 router = APIRouter()
-# TODO(Phase 5): enforce role-based authorization
 
 
 def provider():
@@ -95,7 +95,12 @@ def _sum_costs(filters: TelemetryFilters, db: Session) -> Decimal | None:
 
 
 @router.get("/usage/summary", response_model=UsageSummaryRead)
-def summary(filters: TelemetryFilters = Depends(filters), db: Session = Depends(get_db)):
+def summary(
+    filters: TelemetryFilters = Depends(filters),
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
+):
+    filters = scoped_filters(identity, db, filters)
     result = provider().get_summary(filters)
     return {**result.__dict__, "estimated_cost": _sum_costs(filters, db)}
 
@@ -105,7 +110,9 @@ def timeseries(
     filters: TelemetryFilters = Depends(filters),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
 ):
+    filters = scoped_filters(identity, db, filters)
     items = provider().get_usage_timeseries(filters)
     costs: dict[datetime, Decimal] = defaultdict(lambda: Decimal("0"))
     for record in _records(filters):
@@ -146,7 +153,9 @@ def by_department(
     filters: TelemetryFilters = Depends(filters),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
 ):
+    filters = scoped_filters(identity, db, filters)
     return aggregate_endpoint("get_usage_by_department", "department_id", filters, params, db)
 
 
@@ -155,7 +164,9 @@ def by_team(
     filters: TelemetryFilters = Depends(filters),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
 ):
+    filters = scoped_filters(identity, db, filters)
     return aggregate_endpoint("get_usage_by_team", "team_id", filters, params, db)
 
 
@@ -164,7 +175,9 @@ def by_member(
     filters: TelemetryFilters = Depends(filters),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
 ):
+    filters = scoped_filters(identity, db, filters)
     return aggregate_endpoint("get_usage_by_member", "member_id", filters, params, db)
 
 
@@ -173,7 +186,9 @@ def by_model(
     filters: TelemetryFilters = Depends(filters),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
 ):
+    filters = scoped_filters(identity, db, filters)
     return aggregate_endpoint("get_usage_by_model", "model", filters, params, db)
 
 
@@ -182,14 +197,22 @@ def recent(
     filters: TelemetryFilters = Depends(filters),
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
 ):
+    filters = scoped_filters(identity, db, filters)
     items = provider().get_recent_requests(filters, limit=10000)
     items = [{**item.__dict__, "estimated_cost": _cost(item, db)} for item in items]
     return page(items, params)
 
 
 @router.get("/usage/errors", response_model=PaginatedResponse[ErrorAggregateRead])
-def errors(filters: TelemetryFilters = Depends(filters), params: PageParams = Depends(page_params)):
+def errors(
+    filters: TelemetryFilters = Depends(filters),
+    params: PageParams = Depends(page_params),
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
+):
+    filters = scoped_filters(identity, db, filters)
     return page(provider().get_error_summary(filters), params)
 
 
@@ -197,6 +220,9 @@ def errors(filters: TelemetryFilters = Depends(filters), params: PageParams = De
 def unmapped(
     filters: TelemetryFilters = Depends(filters),
     params: PageParams = Depends(page_params),
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
 ):
+    filters = scoped_filters(identity, db, filters)
     get_unmapped = getattr(provider(), "get_unmapped_subscriptions")
     return page(get_unmapped(filters), params)

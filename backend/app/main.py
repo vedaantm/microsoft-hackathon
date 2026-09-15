@@ -3,6 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from app.api.v1.auth import router as auth_router
 from app.api.v1.budgets import router as budgets_router
 from app.api.v1.hierarchy import router as hierarchy_router
 from app.api.v1.subscriptions import router as subscriptions_router
@@ -16,6 +17,7 @@ class HealthResponse(BaseModel):
 
 app = FastAPI(title="GenAI Token Management Dashboard API")
 telemetry_provider = create_telemetry_provider()
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(hierarchy_router, prefix="/api/v1")
 app.include_router(subscriptions_router, prefix="/api/v1")
 app.include_router(usage_router, prefix="/api/v1")

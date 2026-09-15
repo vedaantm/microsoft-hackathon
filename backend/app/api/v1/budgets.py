@@ -3,6 +3,13 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.api.v1.auth import (
+    Identity,
+    budget_is_visible,
+    ensure_budget_scope,
+    require_role,
+    scoped_filters,
+)
 from app.api.v1.common import commit, get_db, get_or_404, page_params
 from app.models import BudgetPolicy, Department, Member, Organization, Team
 from app.schemas import (
@@ -16,7 +23,6 @@ from app.schemas import (
 from app.telemetry import TelemetryFilters
 
 router = APIRouter()
-# TODO(Phase 5): enforce role-based authorization
 
 
 def _error(message: str, code: str = "budget_conflict") -> HTTPException:
@@ -93,8 +99,16 @@ def resolved_policies(db: Session, as_of: datetime) -> list[tuple[str, int, Budg
 
 
 @router.get("/budgets", response_model=PaginatedResponse[BudgetRead])
-def list_budgets(params: PageParams = Depends(page_params), db: Session = Depends(get_db)):
-    items = db.query(BudgetPolicy).order_by(BudgetPolicy.id).all()
+def list_budgets(
+    params: PageParams = Depends(page_params),
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
+):
+    items = [
+        policy
+        for policy in db.query(BudgetPolicy).order_by(BudgetPolicy.id).all()
+        if budget_is_visible(identity, policy)
+    ]
     start = (params.page - 1) * params.page_size
     return {
         "items": items[start : start + params.page_size],
@@ -104,8 +118,13 @@ def list_budgets(params: PageParams = Depends(page_params), db: Session = Depend
 
 
 @router.post("/budgets", response_model=BudgetRead, status_code=201)
-def create_budget(payload: BudgetCreate, db: Session = Depends(get_db)):
+def create_budget(
+    payload: BudgetCreate,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
+):
     policy = BudgetPolicy(**payload.model_dump())
+    ensure_budget_scope(identity, db, policy)
     ensure_valid(policy, db)
     db.add(policy)
     commit(db)
@@ -114,8 +133,14 @@ def create_budget(payload: BudgetCreate, db: Session = Depends(get_db)):
 
 
 @router.patch("/budgets/{budget_id}", response_model=BudgetRead)
-def patch_budget(budget_id: int, payload: BudgetPatch, db: Session = Depends(get_db)):
+def patch_budget(
+    budget_id: int,
+    payload: BudgetPatch,
+    db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
+):
     policy = get_or_404(db, BudgetPolicy, budget_id)
+    ensure_budget_scope(identity, db, policy)
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(policy, key, value)
     ensure_valid(policy, db, exclude_id=policy.id)
@@ -135,6 +160,7 @@ def budget_status(
     date_to: datetime | None = None,
     params: PageParams = Depends(page_params),
     db: Session = Depends(get_db),
+    identity: Identity = Depends(require_role()),
 ):
     from app.main import telemetry_provider
 
@@ -142,6 +168,7 @@ def budget_status(
         date_from=date_from, date_to=date_to, organization_id=organization_id,
         department_id=department_id, team_id=team_id, member_id=member_id,
     )
+    filters = scoped_filters(identity, db, filters)
     from app.api.v1.usage import _cost
 
     records = telemetry_provider.get_recent_requests(filters, limit=100000)
@@ -160,6 +187,18 @@ def budget_status(
             spent_by_scope[key] = spent_by_scope.get(key, 0) + cost
     rows = []
     for scope_type, scope_id, policy in resolved_policies(db, as_of or datetime.utcnow()):
+        if not budget_is_visible(identity, policy):
+            continue
+        if any(
+            requested is not None and requested != scope_id
+            for requested in (
+                organization_id if scope_type == "organization" else None,
+                department_id if scope_type == "department" else None,
+                team_id if scope_type == "team" else None,
+                member_id if scope_type == "member" else None,
+            )
+        ):
+            continue
         spent = spent_by_scope.get((scope_type, scope_id), 0)
         rows.append({
             "scope_type": scope_type, "scope_id": scope_id,

@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.api.v1.auth import Identity, get_current_identity
 from app.api.v1.common import get_db
 from app.main import app
 from app.models import Base, MemberSubscription
@@ -24,6 +25,15 @@ def client(tmp_path: Path):
             session.close()
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_identity] = lambda: Identity(
+        member_id=1,
+        name="Test Admin",
+        email="admin@example.test",
+        role="org_admin",
+        organization_id=1,
+        department_id=1,
+        team_id=1,
+    )
     with TestClient(app) as test_client:
         yield test_client, factory
     app.dependency_overrides.clear()
