@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Callable
 
@@ -41,12 +41,13 @@ class SeedTelemetryProvider:
 
     def _events(self, filters: TelemetryFilters | None = None) -> list[UsageEvent]:
         filters = filters or TelemetryFilters()
+        date_from = self._sqlite_utc(filters.date_from)
+        date_to = self._sqlite_utc(filters.date_to)
         with self.session_factory() as session:
             query = select(UsageEvent).where(UsageEvent.member_id.is_not(None))
-            if filters.date_from:
-                query = query.where(UsageEvent.timestamp >= filters.date_from)
-            if filters.date_to:
-                date_to = filters.date_to
+            if date_from:
+                query = query.where(UsageEvent.timestamp >= date_from)
+            if date_to:
                 if date_to.time() == datetime.min.time():
                     date_to = date_to + timedelta(days=1)
                 query = query.where(UsageEvent.timestamp < date_to)
@@ -63,6 +64,12 @@ class SeedTelemetryProvider:
             events = list(session.scalars(query.order_by(UsageEvent.timestamp, UsageEvent.id)))
 
         return _deduplicate_events(events)
+
+    @staticmethod
+    def _sqlite_utc(value: datetime | None) -> datetime | None:
+        if value is None or value.tzinfo is None:
+            return value
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
 
     @staticmethod
     def _record(event: UsageEvent) -> UsageRecord:
@@ -193,12 +200,13 @@ class SeedTelemetryProvider:
         self, filters: TelemetryFilters | None = None
     ) -> list[UnmappedSubscription]:
         filters = filters or TelemetryFilters()
+        date_from = self._sqlite_utc(filters.date_from)
+        date_to = self._sqlite_utc(filters.date_to)
         with self.session_factory() as session:
             query = select(UsageEvent).where(UsageEvent.member_id.is_(None))
-            if filters.date_from:
-                query = query.where(UsageEvent.timestamp >= filters.date_from)
-            if filters.date_to:
-                date_to = filters.date_to
+            if date_from:
+                query = query.where(UsageEvent.timestamp >= date_from)
+            if date_to:
                 if date_to.time() == datetime.min.time():
                     date_to = date_to + timedelta(days=1)
                 query = query.where(UsageEvent.timestamp < date_to)

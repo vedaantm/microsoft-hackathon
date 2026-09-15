@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -38,6 +38,12 @@ def _overlaps(candidate: BudgetPolicy, existing: BudgetPolicy) -> bool:
     return candidate.effective_from < existing_end and existing.effective_from < candidate_end
 
 
+def _sqlite_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def ensure_valid(policy: BudgetPolicy, db: Session, exclude_id: int | None = None) -> None:
     if policy.effective_to is not None and policy.effective_to <= policy.effective_from:
         raise _error("effective_to must be after effective_from.", "validation_error")
@@ -58,6 +64,7 @@ def read(policy: BudgetPolicy) -> BudgetPolicy:
 
 
 def resolved_policies(db: Session, as_of: datetime) -> list[tuple[str, int, BudgetPolicy]]:
+    as_of = _sqlite_utc(as_of)
     policies = db.query(BudgetPolicy).filter(BudgetPolicy.status == "active").all()
     selected: dict[tuple[str, int], BudgetPolicy] = {}
     for policy in policies:
@@ -186,7 +193,9 @@ def budget_status(
             key = (scope_type, scope_id)
             spent_by_scope[key] = spent_by_scope.get(key, 0) + cost
     rows = []
-    for scope_type, scope_id, policy in resolved_policies(db, as_of or datetime.utcnow()):
+    for scope_type, scope_id, policy in resolved_policies(
+        db, as_of or datetime.now(timezone.utc)
+    ):
         if not budget_is_visible(identity, policy):
             continue
         if any(
