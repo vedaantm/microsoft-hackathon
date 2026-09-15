@@ -1,0 +1,10 @@
+[
+  {"scope_type": "organization", "scope_slug": "northstar-fictional-labs", "budget_amount": 500.00, "effective_from": "2026-01-01T00:00:00", "effective_to": null},
+  {"scope_type": "department", "scope_slug": "product-engineering", "budget_amount": 180.00, "effective_from": "2026-01-01T00:00:00", "effective_to": null},
+  {"scope_type": "department", "scope_slug": "research-studio", "budget_amount": 220.00, "effective_from": "2026-01-01T00:00:00", "effective_to": null},
+  {"scope_type": "team", "scope_slug": "orbit-builders", "budget_amount": 100.00, "effective_from": "2026-01-01T00:00:00", "effective_to": null},
+  {"scope_type": "team", "scope_slug": "signal-forge", "budget_amount": 80.00, "effective_from": "2026-01-01T00:00:00", "effective_to": null},
+  {"scope_type": "member", "scope_email": "avery.quinn@example.test", "budget_amount": 1.00, "effective_from": "2026-01-01T00:00:00", "effective_to": null},
+  {"scope_type": "member", "scope_email": "mina.park@example.test", "budget_amount": 25.00, "effective_from": "2026-01-01T00:00:00", "effective_to": null},
+  {"scope_type": "member", "scope_email": "nora.vale@example.test", "budget_amount": 10.00, "effective_from": "2026-01-01T00:00:00", "effective_to": null}
+]

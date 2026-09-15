@@ -1,0 +1,48 @@
+{
+  "organization": {
+    "name": "Northstar Fictional Labs",
+    "slug": "northstar-fictional-labs",
+    "status": "active"
+  },
+  "departments": [
+    {"name": "Product Engineering", "slug": "product-engineering", "status": "active"},
+    {"name": "Research Studio", "slug": "research-studio", "status": "active"}
+  ],
+  "teams": [
+    {"department_slug": "product-engineering", "name": "Orbit Builders", "slug": "orbit-builders"},
+    {"department_slug": "product-engineering", "name": "Signal Forge", "slug": "signal-forge"},
+    {"department_slug": "research-studio", "name": "Atlas Lab", "slug": "atlas-lab"},
+    {"department_slug": "research-studio", "name": "Lumen Works", "slug": "lumen-works"}
+  ],
+  "applications": [
+    {"team_slug": "orbit-builders", "name": "Northstar Console", "slug": "northstar-console", "description": "Fictional internal assistant"}
+  ],
+  "members": [
+    {"team_slug": "orbit-builders", "name": "Avery Quinn", "email": "avery.quinn@example.test", "role": "org_admin"},
+    {"team_slug": "orbit-builders", "name": "Mina Park", "email": "mina.park@example.test", "role": "department_manager"},
+    {"team_slug": "orbit-builders", "name": "Theo Grant", "email": "theo.grant@example.test", "role": "team_manager"},
+    {"team_slug": "signal-forge", "name": "Nora Vale", "email": "nora.vale@example.test", "role": "member"},
+    {"team_slug": "signal-forge", "name": "Ishan Cole", "email": "ishan.cole@example.test", "role": "member"},
+    {"team_slug": "signal-forge", "name": "June Ellis", "email": "june.ellis@example.test", "role": "member"},
+    {"team_slug": "atlas-lab", "name": "Rowan Bell", "email": "rowan.bell@example.test", "role": "department_manager"},
+    {"team_slug": "atlas-lab", "name": "Sage Morgan", "email": "sage.morgan@example.test", "role": "team_manager"},
+    {"team_slug": "atlas-lab", "name": "Kai Reed", "email": "kai.reed@example.test", "role": "member"},
+    {"team_slug": "lumen-works", "name": "Emery Stone", "email": "emery.stone@example.test", "role": "team_manager"},
+    {"team_slug": "lumen-works", "name": "Remy Fox", "email": "remy.fox@example.test", "role": "member"},
+    {"team_slug": "lumen-works", "name": "Talia Snow", "email": "talia.snow@example.test", "role": "member"}
+  ],
+  "subscriptions": [
+    {"email": "avery.quinn@example.test", "apim_subscription_id": "northstar-sub-avery-001"},
+    {"email": "mina.park@example.test", "apim_subscription_id": "northstar-sub-mina-002"},
+    {"email": "theo.grant@example.test", "apim_subscription_id": "northstar-sub-theo-003"},
+    {"email": "nora.vale@example.test", "apim_subscription_id": "northstar-sub-nora-004"},
+    {"email": "ishan.cole@example.test", "apim_subscription_id": "northstar-sub-ishan-005"},
+    {"email": "june.ellis@example.test", "apim_subscription_id": "northstar-sub-june-006"},
+    {"email": "rowan.bell@example.test", "apim_subscription_id": "northstar-sub-rowan-007"},
+    {"email": "sage.morgan@example.test", "apim_subscription_id": "northstar-sub-sage-008"},
+    {"email": "kai.reed@example.test", "apim_subscription_id": "northstar-sub-kai-009"},
+    {"email": "emery.stone@example.test", "apim_subscription_id": "northstar-sub-emery-010"},
+    {"email": "remy.fox@example.test", "apim_subscription_id": "northstar-sub-remy-011"},
+    {"email": "talia.snow@example.test", "apim_subscription_id": "northstar-sub-talia-012"}
+  ]
+}
