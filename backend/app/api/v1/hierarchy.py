@@ -103,7 +103,18 @@ def list_departments(
 ) -> dict:
     ensure_scope(identity, db, organization_id=organization_id)
     get_or_404(db, Organization, organization_id)
+    if identity.role in {"team_manager", "member"}:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "authorization_error",
+                "message": "Your role does not permit this action.",
+                "field_errors": [],
+            },
+        )
     query = db.query(Department).filter(Department.organization_id == organization_id)
+    if identity.role == "department_manager":
+        query = query.filter(Department.id == identity.department_id)
     return paginated(query.order_by(Department.id), params)
 
 
@@ -163,6 +174,17 @@ def list_teams(
     ensure_scope(identity, db, department_id=department_id)
     get_or_404(db, Department, department_id)
     query = db.query(Team).filter(Team.department_id == department_id)
+    if identity.role == "member":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "authorization_error",
+                "message": "Your role does not permit this action.",
+                "field_errors": [],
+            },
+        )
+    if identity.role == "team_manager":
+        query = query.filter(Team.id == identity.team_id)
     return paginated(query.order_by(Team.id), params)
 
 
@@ -222,6 +244,15 @@ def list_members(
     ensure_scope(identity, db, team_id=team_id)
     get_or_404(db, Team, team_id)
     query = db.query(Member).filter(Member.team_id == team_id)
+    if identity.role == "member":
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "authorization_error",
+                "message": "Your role does not permit this action.",
+                "field_errors": [],
+            },
+        )
     return paginated(query.order_by(Member.id), params)
 
 

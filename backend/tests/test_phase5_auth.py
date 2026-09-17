@@ -84,6 +84,34 @@ def test_auth_identity_and_logout(auth_client: TestClient) -> None:
     assert auth_client.get("/api/v1/auth/me").status_code == 401
 
 
+def test_department_manager_hierarchy_lists_are_scoped(
+    auth_client: TestClient,
+) -> None:
+    login = auth_client.post(
+        "/api/v1/auth/dev-login", json={"identifier": "mina.park@example.test"}
+    )
+    assert login.status_code == 200, login.text
+
+    departments = auth_client.get("/api/v1/organizations/1/departments")
+    assert departments.status_code == 200, departments.text
+    assert departments.json()["total"] == 1
+    assert [row["id"] for row in departments.json()["items"]] == [1]
+
+    teams = auth_client.get("/api/v1/departments/1/teams")
+    assert teams.status_code == 200, teams.text
+    assert teams.json()["total"] == 2
+    assert {row["id"] for row in teams.json()["items"]} == {1, 2}
+
+    members = auth_client.get("/api/v1/teams/1/members")
+    assert members.status_code == 200, members.text
+    assert members.json()["total"] == 3
+    assert {row["id"] for row in members.json()["items"]} == {1, 2, 3}
+
+    outside_departments = auth_client.get("/api/v1/organizations/1/departments?page=2")
+    assert outside_departments.status_code == 200, outside_departments.text
+    assert outside_departments.json()["items"] == []
+
+
 def test_session_survives_auth_module_restart_with_same_secret(
     auth_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

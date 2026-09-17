@@ -1,48 +1,99 @@
-import { useEffect, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { QueryClient, QueryClientProvider, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
-type HealthResponse = {
-  status: string;
-};
+const API = "/api/v1";
+type Role = "org_admin" | "department_manager" | "team_manager" | "member";
+type Identity = { member_id: number; name: string; email: string; role: Role; organization_id: number; department_id: number; team_id: number };
+type Page<T> = { items: T[]; total: number; page: number; page_size: number };
+type Entity = { id: number; name: string; slug?: string; status: string; organization_id?: number; department_id?: number; team_id?: number; email?: string; role?: string };
+type Filters = { date_from?: string; date_to?: string; organization_id?: number; department_id?: number; team_id?: number; member_id?: number; model?: string; status?: string; interval?: string };
+type Summary = { request_count: number; total_tokens: number | null; estimated_cost: string | number | null; error_count: number };
+type Aggregate = { key: number | string; request_count: number; total_tokens: number | null; estimated_cost: string | number | null };
 
-function App() {
-  const [health, setHealth] = useState<HealthResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, retry: 1 } } });
+const roleLabel: Record<Role, string> = { org_admin: "Organization admin", department_manager: "Department manager", team_manager: "Team manager", member: "Member" };
 
-  useEffect(() => {
-    fetch("/api/v1/system/health")
-      .then((response) => {
-        if (!response.ok) {
-          throw new Error(`Health check failed with ${response.status}`);
-        }
-        return response.json() as Promise<HealthResponse>;
-      })
-      .then(setHealth)
-      .catch((requestError: unknown) => {
-        setError(requestError instanceof Error ? requestError.message : "Health check failed");
-      });
-  }, []);
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API}${path}`, { credentials: "include", headers: { "Content-Type": "application/json", ...options?.headers }, ...options });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw Object.assign(new Error(body.message ?? `Request failed (${response.status})`), { status: response.status });
+  }
+  return response.status === 204 ? (undefined as T) : response.json();
+}
+function params(filters: Filters) { return new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== "").map(([key, value]) => [key, String(value)])); }
+function useApi<T>(key: unknown[], path: string, enabled = true) { return useQuery({ queryKey: key, queryFn: () => request<T>(path), enabled }); }
+function money(value: string | number | null | undefined) { return value == null ? "—" : `$${Number(value).toFixed(2)}`; }
+function count(value: number | null | undefined) { return value == null ? "—" : value.toLocaleString(); }
+function capitalize(value: string) { return value.length === 0 ? value : `${value.charAt(0).toUpperCase()}${value.slice(1)}`; }
+function errorMessage(error: unknown) { return (error as { status?: number })?.status === 403 ? "You don't have access to this." : error instanceof Error ? error.message : "Something went wrong while loading this data."; }
 
-  return (
-    <main className="min-h-screen bg-slate-950 px-6 py-16 text-slate-100">
-      <div className="mx-auto max-w-3xl">
-        <p className="mb-4 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-300">
-          GenAI Token Dashboard
-        </p>
-        <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">Foundation online.</h1>
-        <p className="mt-6 max-w-xl text-lg text-slate-300">
-          Phase 0 is ready for the dashboard work to begin.
-        </p>
-        <section className="mt-12 rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl shadow-cyan-950/30">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-slate-400">
-            API health
-          </h2>
-          {health && <p className="mt-4 text-2xl font-semibold text-emerald-300">{health.status}</p>}
-          {error && <p className="mt-4 text-rose-300">{error}</p>}
-          {!health && !error && <p className="mt-4 text-slate-400">Checking backend...</p>}
-        </section>
-      </div>
-    </main>
-  );
+function State({ loading, error, empty, children }: { loading?: boolean; error?: unknown; empty?: boolean; children: ReactNode }) {
+  if (loading) return <div className="state"><span className="loader" /> Loading data…</div>;
+  if (error) return <div className="state state-error" role="alert"><strong>Unable to load data.</strong><span>{errorMessage(error)}</span></div>;
+  if (empty) return <div className="state"><strong>No data in this view.</strong><span>Try widening the date range or changing the filters.</span></div>;
+  return <>{children}</>;
 }
 
+function FiltersBar({ value, onChange }: { value: Filters; onChange: (next: Filters) => void }) {
+  const set = (key: keyof Filters, next: string) => onChange({ ...value, [key]: next || undefined });
+  return <form className="filter-bar" onSubmit={(event) => event.preventDefault()} aria-label="Usage filters">
+    <label>From<input type="date" value={value.date_from ?? ""} onChange={(event) => set("date_from", event.target.value)} /></label>
+    <label>To<input type="date" value={value.date_to ?? ""} onChange={(event) => set("date_to", event.target.value)} /></label>
+    <label>Model<input placeholder="Model alias" value={value.model ?? ""} onChange={(event) => set("model", event.target.value)} /></label>
+    <label>Status<select value={value.status ?? ""} onChange={(event) => set("status", event.target.value)}><option value="">All statuses</option><option value="success">Success</option><option value="error">Error</option><option value="blocked">Blocked</option><option value="rate_limited">Rate limited</option></select></label>
+    <label>Interval<select value={value.interval ?? "day"} onChange={(event) => set("interval", event.target.value)}><option value="hour">Hourly</option><option value="day">Daily</option><option value="week">Weekly</option></select></label>
+  </form>;
+}
+
+function Metric({ label, value, note }: { label: string; value: ReactNode; note?: string }) { return <div className="metric"><span>{label}</span><strong>{value}</strong>{note && <small>{note}</small>}</div>; }
+function BudgetBar({ value, label = "Budget utilization" }: { value: number | null | undefined; label?: string }) { const percent = value == null ? null : Math.round(value * 100); const status = percent == null ? "unknown" : percent >= 100 ? "over" : percent >= 80 ? "watch" : "good"; return <div className="budget"><div><span>{label}</span><strong>{percent == null ? "—" : `${percent}%`}</strong></div><div className={`budget-track ${status}`}><span style={{ width: `${Math.min(percent ?? 0, 100)}%` }} /></div><small>{status === "unknown" ? "No budget data" : status === "over" ? "Over budget" : status === "watch" ? "Approaching limit" : "Within budget"}</small></div>; }
+
+function UsageTable({ data, loading, error }: { data?: Page<Record<string, unknown>>; loading: boolean; error: unknown }) { return <State loading={loading} error={error} empty={!data?.items.length}><div className="table-wrap"><table><caption className="sr-only">Recent usage requests</caption><thead><tr><th>Timestamp</th><th>Model</th><th>Status</th><th>Tokens</th><th>Cost</th><th>Error</th></tr></thead><tbody>{data?.items.map((row, index) => <tr key={String(row.request_id ?? index)}><td>{String(row.timestamp ?? "—").replace("T", " ").slice(0, 19)}</td><td>{String(row.model ?? "—")}</td><td><span className={`status status-${row.status}`}>{String(row.status ?? "—")}</span></td><td>{count(row.total_tokens as number | null)}</td><td>{money(row.estimated_cost as string | number | null)}</td><td>{String(row.error_code ?? "—")}</td></tr>)}</tbody></table></div></State>; }
+
+function UsagePanel({ identity, filters, title = "Usage activity" }: { identity: Identity; filters: Filters; title?: string }) {
+  const query = `?${params({ ...filters, organization_id: identity.organization_id })}`;
+  const summary = useApi<Summary>(["summary", query], `/usage/summary${query}`);
+  const timeseries = useApi<Page<{ period: string; request_count: number; total_tokens: number | null }>>(["timeseries", query], `/usage/timeseries${query}`);
+  const recent = useApi<Page<Record<string, unknown>>>(["recent", query], `/usage/recent${query}`);
+  const byModel = useApi<Page<Aggregate>>(["by-model", query], `/usage/by-model${query}`);
+  const byTeam = useApi<Page<Aggregate>>(["by-team", query], `/usage/by-team${query}`);
+  const byMember = useApi<Page<Aggregate>>(["by-member", query], `/usage/by-member${query}`);
+  const blocked = useApi<Summary>(["blocked", query], `/usage/summary?${params({ ...filters, organization_id: identity.organization_id, status: "blocked" })}`);
+  const rateLimited = useApi<Summary>(["rate-limited", query], `/usage/summary?${params({ ...filters, organization_id: identity.organization_id, status: "rate_limited" })}`);
+  return <section className="stack"><div className="section-heading"><div><p className="kicker">Telemetry</p><h2>{title}</h2></div><span className="data-note">Scoped to your role</span></div>
+    <State loading={summary.isLoading || blocked.isLoading || rateLimited.isLoading} error={summary.error ?? blocked.error ?? rateLimited.error} empty={!summary.data}><div className="metrics"><Metric label="Requests" value={count(summary.data?.request_count)} /><Metric label="Tokens" value={count(summary.data?.total_tokens)} note="Null dimensions stay visible" /><Metric label="Estimated cost" value={money(summary.data?.estimated_cost)} /><Metric label="Provider errors" value={count(summary.data?.error_count)} /><Metric label="Blocked" value={count(blocked.data?.request_count)} /><Metric label="Rate limited" value={count(rateLimited.data?.request_count)} /></div></State>
+    <div className="split"><ChartCard title="Usage over time"><State loading={timeseries.isLoading} error={timeseries.error} empty={!timeseries.data?.items.length}><ResponsiveContainer width="100%" height={250}><LineChart data={timeseries.data?.items}><CartesianGrid strokeDasharray="3 3" stroke="#d9d6ce" /><XAxis dataKey="period" tickFormatter={(value) => String(value).slice(5, 10)} /><YAxis /><Tooltip /><Line type="monotone" dataKey="request_count" stroke="#e36b38" strokeWidth={3} dot={false} name="Requests" /></LineChart></ResponsiveContainer></State></ChartCard><ChartCard title="Usage by model"><State loading={byModel.isLoading} error={byModel.error} empty={!byModel.data?.items.length}><ResponsiveContainer width="100%" height={250}><BarChart data={byModel.data?.items}><CartesianGrid strokeDasharray="3 3" stroke="#d9d6ce" /><XAxis dataKey="key" /><YAxis /><Tooltip /><Bar dataKey="request_count" fill="#147d83" name="Requests" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></State></ChartCard></div>
+    <div className="split"><ChartCard title="Top-consuming teams"><AggregateList query={byTeam} /></ChartCard><ChartCard title="Top-consuming members"><AggregateList query={byMember} /></ChartCard></div>
+    <ChartCard title="Recent requests"><UsageTable data={recent.data} loading={recent.isLoading} error={recent.error} /></ChartCard>
+  </section>;
+}
+function AggregateList({ query }: { query: ReturnType<typeof useApi<Page<Aggregate>>> }) { return <State loading={query.isLoading} error={query.error} empty={!query.data?.items.length}><div className="aggregate-list">{query.data?.items.slice(0, 5).map((item) => <div className="aggregate-row" key={String(item.key)}><span>{String(item.key)}</span><strong>{count(item.total_tokens)} tokens</strong><small>{count(item.request_count)} requests · {money(item.estimated_cost)}</small></div>)}</div></State>; }
+function ChartCard({ title, children }: { title: string; children: ReactNode }) { return <div className="panel chart-card"><h3>{title}</h3>{children}</div>; }
+
+function ScopePage({ identity, kind }: { identity: Identity; kind: "organization" | "department" | "team" | "member" }) {
+  const [filters, setFilters] = useState<Filters>({ interval: "day" });
+  const ids: Filters = kind === "department" ? { department_id: identity.department_id } : kind === "team" ? { team_id: identity.team_id } : kind === "member" ? { member_id: identity.member_id } : {};
+  const scopePath = kind === "organization" ? `/organizations/${identity.organization_id}` : kind === "department" ? `/departments/${identity.department_id}` : kind === "team" ? `/teams/${identity.team_id}` : `/members/${identity.member_id}`;
+  const entity = useApi<Entity>([kind, scopePath], scopePath);
+  const budget = useApi<Page<{ utilization: number }>>(["budget", kind], `/budgets/status?${params(ids)}`);
+  return <PageFrame identity={identity} title={kind === "organization" ? "Organization overview" : `${capitalize(kind)} view`} subtitle={entity.data?.name ?? "Loading scope"}>
+    <State loading={entity.isLoading} error={entity.error} empty={!entity.data}><div className="identity-line"><span className="scope-mark">{kind.slice(0, 1).toUpperCase()}</span><div><strong>{entity.data?.name}</strong><span>{entity.data?.slug ?? entity.data?.email ?? roleLabel[identity.role]}</span></div></div></State>
+    <FiltersBar value={{ ...filters, ...ids }} onChange={setFilters} /><BudgetBar value={budget.data?.items[0]?.utilization} />
+    <UsagePanel identity={identity} filters={{ ...filters, ...ids }} title={`${capitalize(kind)} usage`} />
+  </PageFrame>;
+}
+
+function Login({ onLogin }: { onLogin: () => void }) { const [identifier, setIdentifier] = useState(""); const [error, setError] = useState(""); const mutation = useMutation({ mutationFn: () => request("/auth/dev-login", { method: "POST", body: JSON.stringify({ identifier }) }), onSuccess: onLogin, onError: (e) => setError(errorMessage(e)) }); return <main className="login"><div className="login-panel"><p className="kicker">GenAI control room</p><h1>Know what your models are spending.</h1><p className="lede">A focused view of request volume, token flow, budgets, and the people behind them.</p><form onSubmit={(event: FormEvent) => { event.preventDefault(); setError(""); mutation.mutate(); }}><label>Member email or ID<input autoFocus required value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="alex@example.com" /></label><button className="button button-primary" disabled={mutation.isPending}>{mutation.isPending ? "Signing in…" : "Sign in to development mode"}</button>{error && <p className="form-error" role="alert">{error}</p>}</form><small>Development authentication uses a secure HttpOnly session cookie.</small></div></main>; }
+
+function MappingPage({ identity }: { identity: Identity }) { const [memberId, setMemberId] = useState(String(identity.member_id)); const [subscriptionId, setSubscriptionId] = useState(""); const [displayName, setDisplayName] = useState(""); const [status, setStatus] = useState("active"); const subscription = useApi<{ apim_subscription_id: string; subscription_display_name: string | null; status: string }>(["subscription", memberId], `/members/${memberId}/subscription`, Boolean(memberId)); const qc = useQueryClient(); const mutation = useMutation({ mutationFn: () => request(`/members/${memberId}/subscription`, { method: "PUT", body: JSON.stringify({ apim_subscription_id: subscriptionId || subscription.data?.apim_subscription_id, subscription_display_name: displayName || subscription.data?.subscription_display_name, status }) }), onSuccess: () => qc.invalidateQueries({ queryKey: ["subscription", memberId] }) }); return <PageFrame identity={identity} title="Member subscription mappings" subtitle="APIM identifiers only. Raw keys never appear here."><section className="panel mapping-panel"><div className="section-heading"><div><p className="kicker">Administration</p><h2>View or edit a mapping</h2></div></div><form className="mapping-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(); }}><label>Member ID<input inputMode="numeric" value={memberId} onChange={(event) => setMemberId(event.target.value)} /></label><State loading={subscription.isLoading} error={subscription.error} empty={false}><label>APIM subscription ID<input required value={subscriptionId || subscription.data?.apim_subscription_id || ""} onChange={(event) => setSubscriptionId(event.target.value)} /></label><label>Display name<input value={displayName || subscription.data?.subscription_display_name || ""} onChange={(event) => setDisplayName(event.target.value)} /></label><label>Status<select value={status || subscription.data?.status || "active"} onChange={(event) => setStatus(event.target.value)}><option value="active">Active</option><option value="inactive">Inactive</option><option value="archived">Archived</option></select></label><button className="button button-primary" disabled={mutation.isPending}>{mutation.isPending ? "Saving…" : "Save mapping"}</button></State>{mutation.error && <p className="form-error" role="alert">{errorMessage(mutation.error)}</p>}</form></section></PageFrame>; }
+
+function PageFrame({ identity, title, subtitle, children }: { identity: Identity; title: string; subtitle?: string; children: ReactNode }) { const qc = useQueryClient(); return <div className="app-shell"><aside className="sidebar"><div className="brand"><span className="brand-glyph">G</span><div><strong>GenAI</strong><span>usage office</span></div></div><nav aria-label="Main navigation"><a href={homePath(identity)}>Overview</a>{identity.role === "org_admin" && <><p className="nav-label">Administration</p><a href="#admin/organizations">Organizations</a><a href="#admin/departments">Departments</a><a href="#admin/teams">Teams</a><a href="#admin/members">Members</a><a href="#admin/mappings">Subscription mappings</a><a href="#admin/budgets">Budget policies</a><a href="#admin/unmapped">Unmapped subscriptions</a></>}</nav><div className="sidebar-foot"><span>{identity.name}</span><small>{roleLabel[identity.role]}</small><button className="button button-quiet" onClick={async () => { await request("/auth/logout", { method: "POST" }); qc.clear(); window.location.hash = ""; window.location.reload(); }}>Sign out</button></div></aside><main className="content"><header className="topbar"><div><p className="kicker">{roleLabel[identity.role]}</p><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div><span className="live-chip"><i /> Seed telemetry</span></header>{children}</main></div>; }
+function homePath(identity: Identity) { return identity.role === "org_admin" ? "#org" : identity.role === "department_manager" ? "#department" : identity.role === "team_manager" ? "#team" : "#member"; }
+
+function AdminPage({ identity, resource }: { identity: Identity; resource: string }) { const fallback = { label: "Organizations", path: "/organizations", fields: ["name", "slug", "status"] }; const config: Record<string, typeof fallback> = { organizations: fallback, departments: { label: "Departments", path: `/organizations/${identity.organization_id}/departments`, fields: ["name", "slug", "status"] }, teams: { label: "Teams", path: `/departments/${identity.department_id}/teams`, fields: ["name", "slug", "status"] }, members: { label: "Members", path: `/teams/${identity.team_id}/members`, fields: ["name", "email", "role", "status"] }, budgets: { label: "Budget policies", path: "/budgets", fields: ["scope_type", "scope_id", "budget_amount", "currency", "status"] }, unmapped: { label: "Unmapped subscriptions", path: "/usage/unmapped", fields: [] } }; const item = config[resource] ?? fallback; const list = useApi<Page<Record<string, unknown>>>(["admin", resource, item.path], `${item.path}?page_size=100`); const [form, setForm] = useState<Record<string, string>>({}); const qc = useQueryClient(); const mutation = useMutation({ mutationFn: () => request(item.path, { method: "POST", body: JSON.stringify(form) }), onSuccess: () => { setForm({}); qc.invalidateQueries({ queryKey: ["admin", resource] }); } }); const canWrite = identity.role === "org_admin" && resource !== "unmapped"; const columns = item.fields.length ? item.fields : ["apim_subscription_id", "request_count", "first_seen", "last_seen", "total_tokens", "estimated_cost"]; return <PageFrame identity={identity} title={item.label} subtitle="Live records from the authorized backend scope"><section className="panel"><div className="section-heading"><div><p className="kicker">Administration</p><h2>{item.label}</h2></div>{canWrite && <form className="inline-form" onSubmit={(event) => { event.preventDefault(); mutation.mutate(); }}>{item.fields.slice(0, 3).map((field) => <input key={field} aria-label={field} placeholder={field.replace("_", " ")} value={form[field] ?? ""} onChange={(event) => setForm({ ...form, [field]: event.target.value })} required={field !== "status"} />)}<button className="button button-primary" disabled={mutation.isPending}>Add</button></form>}</div><State loading={list.isLoading} error={list.error} empty={!list.data?.items.length}><div className="table-wrap"><table><thead><tr>{columns.map((field) => <th key={field}>{field.split("_").join(" ")}</th>)}<th>Record</th></tr></thead><tbody>{list.data?.items.map((row, index) => <tr key={String(row.id ?? row.apim_subscription_id ?? index)}>{columns.map((field) => <td key={field}>{field.includes("cost") ? money(row[field] as string | number | null) : field.includes("tokens") ? count(row[field] as number | null) : String(row[field] ?? "—")}</td>)}<td><span className="record-id">{String(row.id ?? "unmapped")}</span></td></tr>)}</tbody></table></div></State></section></PageFrame>; }
+
+function AppInner() { const [loginVersion, setLoginVersion] = useState(0); const me = useApi<Identity>(["me", loginVersion], "/auth/me"); if (me.isLoading) return <div className="boot"><span className="loader" /> Resolving your workspace…</div>; if (me.error) return <Login onLogin={() => setLoginVersion((value) => value + 1)} />; const identity = me.data!; const hash = window.location.hash.slice(1); if (hash === "admin/mappings") return <MappingPage identity={identity} />; if (hash.startsWith("admin/")) return <AdminPage identity={identity} resource={hash.slice(6)} />; return <ScopePage identity={identity} kind={hash === "department" ? "department" : hash === "team" ? "team" : hash === "member" ? "member" : identity.role === "org_admin" ? "organization" : identity.role === "department_manager" ? "department" : identity.role === "team_manager" ? "team" : "member"} />; }
+function App() { const [, refresh] = useState(0); useEffect(() => { const handler = () => refresh((value) => value + 1); window.addEventListener("hashchange", handler); return () => window.removeEventListener("hashchange", handler); }, []); return <QueryClientProvider client={queryClient}><AppInner /></QueryClientProvider>; }
 export default App;
