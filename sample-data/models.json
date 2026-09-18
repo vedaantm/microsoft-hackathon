@@ -1,5 +1,6 @@
 [
   {"alias": "northstar-chat", "provider_model": "fictional-chat-1", "input_cost_per_1k_tokens": 0.002, "output_cost_per_1k_tokens": 0.006, "effective_from": "2026-01-01T00:00:00"},
   {"alias": "northstar-reason", "provider_model": "fictional-reasoner-2", "input_cost_per_1k_tokens": 0.008, "output_cost_per_1k_tokens": 0.024, "effective_from": "2026-01-01T00:00:00"},
-  {"alias": "northstar-fast", "provider_model": "fictional-fast-3", "input_cost_per_1k_tokens": 0.001, "output_cost_per_1k_tokens": 0.003, "effective_from": "2026-01-01T00:00:00"}
+  {"alias": "northstar-fast", "provider_model": "fictional-fast-3", "input_cost_per_1k_tokens": 0.001, "output_cost_per_1k_tokens": 0.003, "effective_from": "2026-01-01T00:00:00"},
+  {"alias": "local-live", "provider_model": "local-live", "input_cost_per_1k_tokens": 0, "output_cost_per_1k_tokens": 0, "effective_from": "2026-01-01T00:00:00"}
 ]

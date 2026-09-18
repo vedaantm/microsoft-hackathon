@@ -219,6 +219,7 @@ class UsageEvent(Base):
     estimated_cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
     latency_ms: Mapped[int | None] = mapped_column(Integer)
     error_code: Mapped[str | None] = mapped_column(String(100))
+    telemetry_source: Mapped[str] = mapped_column(String(30), default="seeded", nullable=False)
 
     organization: Mapped[Organization | None] = relationship(back_populates="usage_events")
     department: Mapped[Department | None] = relationship(back_populates="usage_events")

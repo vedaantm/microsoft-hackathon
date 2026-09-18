@@ -3,6 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from app.api.gateway import router as gateway_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.budgets import router as budgets_router
 from app.api.v1.hierarchy import router as hierarchy_router
@@ -23,6 +24,7 @@ app.include_router(hierarchy_router, prefix="/api/v1")
 app.include_router(subscriptions_router, prefix="/api/v1")
 app.include_router(usage_router, prefix="/api/v1")
 app.include_router(budgets_router, prefix="/api/v1")
+app.include_router(gateway_router, prefix="/gateway/v1")
 app.include_router(alerts_router, prefix="/api/v1")
 app.include_router(audit_router, prefix="/api/v1")
 

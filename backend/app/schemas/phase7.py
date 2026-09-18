@@ -1,7 +1,8 @@
-from datetime import datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
+
+from app.schemas.common import UtcDatetime
 
 
 class AlertRead(BaseModel):
@@ -15,9 +16,9 @@ class AlertRead(BaseModel):
     severity: str
     message: str
     status: str
-    triggered_at: datetime
-    acknowledged_at: datetime | None
-    resolved_at: datetime | None
+    triggered_at: UtcDatetime
+    acknowledged_at: UtcDatetime | None
+    resolved_at: UtcDatetime | None
 
 
 class AuditEventRead(BaseModel):
@@ -29,5 +30,5 @@ class AuditEventRead(BaseModel):
     action: str
     entity_type: str
     entity_id: int | None
-    occurred_at: datetime
+    occurred_at: UtcDatetime
     details: dict[str, Any] | None

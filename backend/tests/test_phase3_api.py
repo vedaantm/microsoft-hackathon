@@ -119,11 +119,11 @@ def test_subscription_mapping_never_exposes_key_like_fields(client) -> None:
     }
     assert not any("key" in key.lower() or "secret" in key.lower() for key in response.json())
     assert response.json()["subscription_display_name"] == "Ada's subscription"
-    assert response.json()["last_rotated_at"] == "2026-09-15T12:00:00"
+    assert response.json()["last_rotated_at"] == "2026-09-15T12:00:00Z"
     fetched = test_client.get(f"/api/v1/members/{member['id']}/subscription")
     assert fetched.status_code == 200
     assert fetched.json()["subscription_display_name"] == "Ada's subscription"
-    assert fetched.json()["last_rotated_at"] == "2026-09-15T12:00:00"
+    assert fetched.json()["last_rotated_at"] == "2026-09-15T12:00:00Z"
     rejected = test_client.put(
         f"/api/v1/members/{member['id']}/subscription",
         json={"apim_subscription_id": "subscription-1", "primary_key": "must-never-appear"},
@@ -143,8 +143,8 @@ def test_subscription_mapping_never_exposes_key_like_fields(client) -> None:
     assert patched.status_code == 200
     assert set(patched.json()) == set(response.json())
     assert patched.json()["subscription_display_name"] == "Ada's rotated subscription"
-    assert patched.json()["last_rotated_at"] == "2026-09-15T13:00:00"
+    assert patched.json()["last_rotated_at"] == "2026-09-15T13:00:00Z"
     fetched = test_client.get(f"/api/v1/members/{member['id']}/subscription")
     assert fetched.json()["subscription_display_name"] == "Ada's rotated subscription"
-    assert fetched.json()["last_rotated_at"] == "2026-09-15T13:00:00"
+    assert fetched.json()["last_rotated_at"] == "2026-09-15T13:00:00Z"
     assert test_client.delete(f"/api/v1/subscriptions/{subscription_id}").status_code == 204

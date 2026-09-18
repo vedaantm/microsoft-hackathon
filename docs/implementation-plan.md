@@ -163,6 +163,15 @@ Standard error shape: `{ "error": "<code>", "message": "<human readable>", "fiel
 
 ## 11. Phased implementation plan
 
+### Local gateway addendum
+
+Real Azure APIM access was lost mid-project, so a local `/gateway/v1` OpenAI-compatible
+gateway was added to prove the unified-model-API flow end to end. It authenticates with
+the existing member subscription mapping, forwards to an OpenAI-compatible provider, and
+writes live usage directly to the existing usage-event table. Phase 8's Azure Monitor
+provider remains unchanged and is still the intended production telemetry path when Azure
+access returns.
+
 | Phase | Goal | Key deliverables | Tests | Complexity |
 |---|---|---|---|---|
 | 0 | Repo foundation & tooling | `docker-compose.yml`, `.env.example`, backend/frontend skeletons, CI skeleton, one documented start command | CI runs green on an empty app | Small |

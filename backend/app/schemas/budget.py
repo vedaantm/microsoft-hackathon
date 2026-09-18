@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.common import UtcDatetime
+
 
 class BudgetCreate(BaseModel):
     organization_id: int
@@ -25,8 +27,10 @@ class BudgetPatch(BaseModel):
 
 class BudgetRead(BudgetCreate):
     id: int
-    created_at: datetime
-    updated_at: datetime
+    effective_from: UtcDatetime
+    effective_to: UtcDatetime | None = None
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
 
 class BudgetStatusRead(BaseModel):

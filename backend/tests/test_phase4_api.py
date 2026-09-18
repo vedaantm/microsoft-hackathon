@@ -71,6 +71,28 @@ def test_usage_filters_reach_seed_provider(phase4_client) -> None:
     assert [item["request_id"] for item in response.json()["items"]] == ["seed-001"]
 
 
+def test_datetime_response_fields_are_explicitly_utc(phase4_client) -> None:
+    client, _factory = phase4_client
+
+    recent = client.get("/api/v1/usage/recent?page_size=1").json()["items"][0]
+    timeseries = client.get("/api/v1/usage/timeseries?page_size=1").json()["items"][0]
+    unmapped = client.get("/api/v1/usage/unmapped?page_size=1").json()["items"][0]
+    alert = client.get("/api/v1/alerts?page_size=1").json()["items"][0]
+    organization = client.get("/api/v1/organizations/1").json()
+    budget = client.get("/api/v1/budgets?page_size=1").json()["items"][0]
+
+    assert recent["timestamp"].endswith("Z")
+    assert timeseries["period"].endswith("Z")
+    assert unmapped["first_seen"].endswith("Z")
+    assert unmapped["last_seen"].endswith("Z")
+    assert alert["triggered_at"].endswith("Z")
+    assert organization["created_at"].endswith("Z")
+    assert organization["updated_at"].endswith("Z")
+    assert budget["effective_from"].endswith("Z")
+    assert budget["created_at"].endswith("Z")
+    assert budget["updated_at"].endswith("Z")
+
+
 def test_budget_crud_and_four_level_inheritance(phase4_client) -> None:
     client, factory = phase4_client
     organization_id = 1

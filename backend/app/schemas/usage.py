@@ -1,7 +1,8 @@
-from datetime import datetime
 from decimal import Decimal
 
 from pydantic import BaseModel
+
+from app.schemas.common import UtcDatetime
 
 
 class UsageSummaryRead(BaseModel):
@@ -12,7 +13,7 @@ class UsageSummaryRead(BaseModel):
 
 
 class UsagePointRead(BaseModel):
-    period: datetime
+    period: UtcDatetime
     request_count: int
     total_tokens: int | None
     estimated_cost: Decimal | None
@@ -28,7 +29,7 @@ class UsageAggregateRead(BaseModel):
 class UsageRecordRead(BaseModel):
     request_id: str
     apim_subscription_id: str
-    timestamp: datetime
+    timestamp: UtcDatetime
     organization_id: int
     department_id: int
     team_id: int
@@ -51,7 +52,7 @@ class ErrorAggregateRead(BaseModel):
 class UnmappedSubscriptionRead(BaseModel):
     apim_subscription_id: str
     request_count: int
-    first_seen: datetime
-    last_seen: datetime
+    first_seen: UtcDatetime
+    last_seen: UtcDatetime
     total_tokens: int | None
     estimated_cost: Decimal | None

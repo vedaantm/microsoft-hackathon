@@ -85,6 +85,7 @@ def seed(session: Session) -> None:
             )
         )
 
+    # Local gateway pricing is $0 while it uses a free tier; replace it when billing applies.
     for item in load_json("models.json"):
         session.add(
             ModelConfiguration(

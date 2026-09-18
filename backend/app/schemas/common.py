@@ -1,8 +1,23 @@
-from typing import Generic, TypeVar
+from datetime import datetime, timezone
+from typing import Annotated, Generic, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PlainSerializer
 
 SchemaType = TypeVar("SchemaType")
+
+
+def _serialize_utc_datetime(value: datetime) -> str:
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    else:
+        value = value.astimezone(timezone.utc)
+    return value.isoformat().replace("+00:00", "Z")
+
+
+UtcDatetime = Annotated[
+    datetime,
+    PlainSerializer(_serialize_utc_datetime, return_type=str),
+]
 
 
 class PageParams(BaseModel):

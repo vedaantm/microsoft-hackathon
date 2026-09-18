@@ -2,6 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.common import UtcDatetime
+
 
 class OrganizationCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
@@ -22,8 +24,8 @@ class OrganizationRead(BaseModel):
     name: str
     slug: str
     status: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
 
 class DepartmentCreate(BaseModel):
@@ -46,8 +48,8 @@ class DepartmentRead(BaseModel):
     name: str
     slug: str
     status: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
 
 class TeamCreate(BaseModel):
@@ -71,8 +73,8 @@ class TeamRead(BaseModel):
     name: str
     slug: str
     status: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
 
 class MemberCreate(BaseModel):
@@ -100,8 +102,8 @@ class MemberRead(BaseModel):
     email: str
     role: str
     status: str
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
 
 
 class SubscriptionUpdate(BaseModel):
@@ -126,4 +128,4 @@ class SubscriptionRead(BaseModel):
     apim_subscription_id: str
     subscription_display_name: str | None = None
     status: str
-    last_rotated_at: datetime | None = None
+    last_rotated_at: UtcDatetime | None = None
