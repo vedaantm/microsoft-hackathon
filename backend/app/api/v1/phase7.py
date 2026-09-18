@@ -67,6 +67,19 @@ def _change_alert_status(alert_id: int, status: str, db: Session, identity: Iden
 
         alert = get_or_404(db, Alert, alert_id)
     _ensure_alert_scope(identity, db, alert)
+    valid_transition = (alert.status, status) in {
+        ("open", "acknowledged"),
+        ("acknowledged", "resolved"),
+    }
+    if not valid_transition:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "invalid_alert_transition",
+                "message": f"Alert cannot transition from {alert.status} to {status}.",
+                "field_errors": [],
+            },
+        )
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     if status == "acknowledged":
         alert.status = status

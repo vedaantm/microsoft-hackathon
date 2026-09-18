@@ -60,12 +60,6 @@ def compute_alert_candidates(
     repeated: defaultdict[tuple[str, tuple[str, int]], int] = defaultdict(int)
     missing: defaultdict[tuple[str, int], int] = defaultdict(int)
     mapped_subscription_ids = {subscription.apim_subscription_id for subscription in subscriptions}
-    organization_ids = {
-        event.organization_id
-        for event in events
-        if event.organization_id is not None
-    }
-
     for event in events:
         scope = _scope(event)
         if scope is not None and event.organization_id is not None:
@@ -82,8 +76,11 @@ def compute_alert_candidates(
             ):
                 missing[scope] += 1
 
-        if event.apim_subscription_id not in mapped_subscription_ids:
-            organization_id = event.organization_id or next(iter(organization_ids), 1)
+        if (
+            event.apim_subscription_id not in mapped_subscription_ids
+            and event.organization_id is not None
+        ):
+            organization_id = event.organization_id
             candidates.append(
                 _candidate(
                     organization_id,
