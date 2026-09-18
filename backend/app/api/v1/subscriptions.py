@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.auth import Identity, ensure_scope, require_role
 from app.api.v1.common import commit, get_db, get_or_404
+from app.audit import record_audit
 from app.models import Member, MemberSubscription
 from app.schemas import SubscriptionPatch, SubscriptionRead, SubscriptionUpdate
 
@@ -68,6 +69,9 @@ def put_subscription(
             setattr(subscription, key, value)
     commit(db)
     db.refresh(subscription)
+    record_audit(
+        db, identity, action="upsert", entity_type="member_subscription", entity_id=subscription.id
+    )
     return public_subscription(subscription)
 
 
@@ -85,6 +89,9 @@ def patch_subscription(
         setattr(subscription, key, value)
     commit(db)
     db.refresh(subscription)
+    record_audit(
+        db, identity, action="update", entity_type="member_subscription", entity_id=subscription.id
+    )
     return public_subscription(subscription)
 
 
@@ -98,3 +105,6 @@ def delete_subscription(
     ensure_scope(identity, db, member_id=subscription.member_id)
     db.delete(subscription)
     commit(db)
+    record_audit(
+        db, identity, action="delete", entity_type="member_subscription", entity_id=subscription_id
+    )

@@ -17,6 +17,7 @@ from app.schemas.organization import (
     TeamRead,
     TeamUpdate,
 )
+from app.schemas.phase7 import AlertRead, AuditEventRead
 from app.schemas.usage import (
     ErrorAggregateRead,
     UnmappedSubscriptionRead,
@@ -55,4 +56,6 @@ __all__ = [
     "UsagePointRead",
     "UsageRecordRead",
     "UsageSummaryRead",
+    "AlertRead",
+    "AuditEventRead",
 ]

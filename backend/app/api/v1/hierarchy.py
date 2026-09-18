@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.v1.auth import Identity, ensure_scope, require_role
 from app.api.v1.common import commit, get_db, get_or_404, page_params
+from app.audit import record_audit
 from app.models import Department, Member, Organization, Team
 from app.schemas import (
     DepartmentCreate,
@@ -62,6 +63,9 @@ def create_organization(
     db.add(organization)
     commit(db)
     db.refresh(organization)
+    record_audit(
+        db, identity, action="create", entity_type="organization", entity_id=organization.id
+    )
     return organization
 
 
@@ -88,6 +92,9 @@ def update_organization(
         setattr(organization, key, value)
     commit(db)
     db.refresh(organization)
+    record_audit(
+        db, identity, action="update", entity_type="organization", entity_id=organization.id
+    )
     return organization
 
 
@@ -135,6 +142,7 @@ def create_department(
     db.add(department)
     commit(db)
     db.refresh(department)
+    record_audit(db, identity, action="create", entity_type="department", entity_id=department.id)
     return department
 
 
@@ -161,6 +169,7 @@ def update_department(
         setattr(department, key, value)
     commit(db)
     db.refresh(department)
+    record_audit(db, identity, action="update", entity_type="department", entity_id=department.id)
     return department
 
 
@@ -205,6 +214,7 @@ def create_team(
     db.add(team)
     commit(db)
     db.refresh(team)
+    record_audit(db, identity, action="create", entity_type="team", entity_id=team.id)
     return team
 
 
@@ -231,6 +241,7 @@ def update_team(
         setattr(team, key, value)
     commit(db)
     db.refresh(team)
+    record_audit(db, identity, action="update", entity_type="team", entity_id=team.id)
     return team
 
 
@@ -274,6 +285,7 @@ def create_member(
     db.add(member)
     commit(db)
     db.refresh(member)
+    record_audit(db, identity, action="create", entity_type="member", entity_id=member.id)
     return member
 
 
@@ -300,4 +312,5 @@ def update_member(
         setattr(member, key, value)
     commit(db)
     db.refresh(member)
+    record_audit(db, identity, action="update", entity_type="member", entity_id=member.id)
     return member

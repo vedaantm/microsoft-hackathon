@@ -11,6 +11,7 @@ from app.api.v1.auth import (
     scoped_filters,
 )
 from app.api.v1.common import commit, get_db, get_or_404, page_params
+from app.audit import record_audit
 from app.models import BudgetPolicy, Department, Member, Organization, Team
 from app.schemas import (
     BudgetCreate,
@@ -136,6 +137,7 @@ def create_budget(
     db.add(policy)
     commit(db)
     db.refresh(policy)
+    record_audit(db, identity, action="create", entity_type="budget_policy", entity_id=policy.id)
     return read(policy)
 
 
@@ -153,6 +155,7 @@ def patch_budget(
     ensure_valid(policy, db, exclude_id=policy.id)
     commit(db)
     db.refresh(policy)
+    record_audit(db, identity, action="update", entity_type="budget_policy", entity_id=policy.id)
     return read(policy)
 
 
@@ -172,8 +175,12 @@ def budget_status(
     from app.main import telemetry_provider
 
     filters = TelemetryFilters(
-        date_from=date_from, date_to=date_to, organization_id=organization_id,
-        department_id=department_id, team_id=team_id, member_id=member_id,
+        date_from=date_from,
+        date_to=date_to,
+        organization_id=organization_id,
+        department_id=department_id,
+        team_id=team_id,
+        member_id=member_id,
     )
     filters = scoped_filters(identity, db, filters)
     from app.api.v1.usage import _cost
@@ -193,9 +200,7 @@ def budget_status(
             key = (scope_type, scope_id)
             spent_by_scope[key] = spent_by_scope.get(key, 0) + cost
     rows = []
-    for scope_type, scope_id, policy in resolved_policies(
-        db, as_of or datetime.now(timezone.utc)
-    ):
+    for scope_type, scope_id, policy in resolved_policies(db, as_of or datetime.now(timezone.utc)):
         if not budget_is_visible(identity, policy):
             continue
         if any(
@@ -209,14 +214,17 @@ def budget_status(
         ):
             continue
         spent = spent_by_scope.get((scope_type, scope_id), 0)
-        rows.append({
-            "scope_type": scope_type, "scope_id": scope_id,
-            "budget_amount": policy.budget_amount,
-            "estimated_spent_amount": spent,
-            "estimated_remaining_amount": policy.budget_amount - spent,
-            "utilization": spent / policy.budget_amount if policy.budget_amount else 0,
-            "currency": policy.currency,
-        })
+        rows.append(
+            {
+                "scope_type": scope_type,
+                "scope_id": scope_id,
+                "budget_amount": policy.budget_amount,
+                "estimated_spent_amount": spent,
+                "estimated_remaining_amount": policy.budget_amount - spent,
+                "utilization": spent / policy.budget_amount if policy.budget_amount else 0,
+                "currency": policy.currency,
+            }
+        )
     start = (params.page - 1) * params.page_size
     return {
         "items": rows[start : start + params.page_size],
