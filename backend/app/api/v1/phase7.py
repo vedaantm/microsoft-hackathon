@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.alerts import refresh_alerts
 from app.api.v1.auth import Identity, ensure_scope, require_role
 from app.api.v1.common import get_db, page_params
+from app.audit import record_audit
 from app.models import Alert, AuditEvent
 from app.schemas import AlertRead, AuditEventRead, PageParams, PaginatedResponse
 
@@ -89,6 +90,13 @@ def _change_alert_status(alert_id: int, status: str, db: Session, identity: Iden
         alert.resolved_at = now
     db.commit()
     db.refresh(alert)
+    record_audit(
+        db,
+        identity,
+        action=status,
+        entity_type="alert",
+        entity_id=alert.id,
+    )
     return alert
 
 

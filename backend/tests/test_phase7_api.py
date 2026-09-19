@@ -169,6 +169,12 @@ def test_alert_lifecycle_requires_open_acknowledged_resolved(tmp_path, monkeypat
         resolved = client.post("/api/v1/alerts/1/resolve")
         assert resolved.status_code == 200
         assert resolved.json()["status"] == "resolved"
+        audit = client.get("/api/v1/audit-events?page_size=100")
+        assert audit.status_code == 200
+        assert [
+            (item["action"], item["entity_type"], item["entity_id"])
+            for item in audit.json()["items"]
+        ][:2] == [("resolved", "alert", 1), ("acknowledged", "alert", 1)]
         rejected = client.post("/api/v1/alerts/1/acknowledge")
         assert rejected.status_code == 409
         assert rejected.json() == {

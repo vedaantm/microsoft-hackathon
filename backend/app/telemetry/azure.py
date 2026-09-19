@@ -13,9 +13,11 @@ from app.telemetry.contracts import (
 
 
 class AzureMonitorTelemetryProvider(TelemetryProvider):
+    """Intentional placeholder until Azure Monitor access and KQL are verified."""
+
     def _not_implemented(self) -> None:
         raise NotImplementedError(
-            "Azure Monitor telemetry queries are planned for Phase 8 and are not implemented yet."
+            "Azure Monitor telemetry is planned for Phase 8, but its queries are not implemented."
         )
 
     def get_summary(self, filters: TelemetryFilters | None = None) -> Summary:

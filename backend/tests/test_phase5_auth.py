@@ -112,6 +112,48 @@ def test_department_manager_hierarchy_lists_are_scoped(
     assert outside_departments.json()["items"] == []
 
 
+@pytest.mark.parametrize(
+    ("identifier", "outside_query"),
+    [
+        ("mina.park@example.test", "department_id=2"),
+        ("theo.grant@example.test", "team_id=3"),
+    ],
+)
+def test_scoped_list_endpoints_reject_cross_scope_filters(
+    auth_client: TestClient, identifier: str, outside_query: str
+) -> None:
+    login = auth_client.post("/api/v1/auth/dev-login", json={"identifier": identifier})
+    assert login.status_code == 200, login.text
+
+    for path in (
+        "/api/v1/usage/summary",
+        "/api/v1/usage/timeseries",
+        "/api/v1/usage/by-department",
+        "/api/v1/usage/by-team",
+        "/api/v1/usage/by-member",
+        "/api/v1/usage/by-model",
+        "/api/v1/usage/recent",
+        "/api/v1/usage/errors",
+        "/api/v1/usage/unmapped",
+        "/api/v1/budgets/status",
+    ):
+        response = auth_client.get(f"{path}?{outside_query}")
+        assert response.status_code == 403, f"{path}: {response.text}"
+
+    assert auth_client.get(f"/api/v1/budgets?{outside_query}").status_code == 200
+    assert auth_client.get("/api/v1/alerts").status_code == 200
+    assert auth_client.get("/api/v1/audit-events").status_code == 403
+
+    if "department_id" in outside_query:
+        assert auth_client.get("/api/v1/departments/2/teams").status_code == 403
+        assert auth_client.get("/api/v1/teams/3/members").status_code == 403
+    else:
+        teams = auth_client.get("/api/v1/departments/1/teams")
+        assert teams.status_code == 200
+        assert {item["id"] for item in teams.json()["items"]} == {1}
+        assert auth_client.get("/api/v1/teams/3/members").status_code == 403
+
+
 def test_session_survives_auth_module_restart_with_same_secret(
     auth_client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -1,12 +1,12 @@
 # Organization GenAI Token-Management Dashboard — Implementation Plan
 
-Status: planning only. No application code, Azure resources, or APIM simulator has been created as part of this document.
+Status: implementation completed through Phase 11 review. The application and local gateway exist; Azure resources are external to this repository, and the Azure Monitor provider remains an intentional placeholder.
 
 ---
 
 ## 1. Repository assessment
 
-No existing repository was available to inspect in this session, so this plan assumes a **fresh scaffold** rather than reporting on real files. Before Phase 0 begins, re-run this assessment against the actual repo and update this section with:
+The repository now contains the implemented FastAPI backend, React frontend, local gateway, database migrations, seed fixtures, and test suites described by the later phases. This section is retained as the original assessment record rather than a claim that the repository is still an empty scaffold.
 
 - Files and directories that already exist.
 - Technologies already chosen (if any) that conflict with Section 7's proposed stack.
@@ -144,9 +144,9 @@ Standard error shape: `{ "error": "<code>", "message": "<human readable>", "fiel
 
 ## 9. Security plan
 
-**Threat model** (condensed from the brief's Section 19): stolen or shared subscription keys, member impersonation via forged headers, cross-team/department/org data leakage, broken object-level authorization, credentials committed to git or leaked via logs/frontend/Azure queries, accidental prompt/completion storage, SQL injection, filter-manipulation, rate-limit bypass, duplicate telemetry, metric-cardinality data loss, streaming token inaccuracy, dev-auth accidentally enabled in production.
+**Threat model** (condensed from the brief's Section 19 and the local gateway): stolen or shared subscription keys, member impersonation via forged headers, cross-team/department/org data leakage, broken object-level authorization, credentials committed to git or leaked via logs/frontend/Azure queries, accidental prompt/completion storage, SQL injection, filter-manipulation, rate-limit bypass, duplicate telemetry, metric-cardinality data loss, streaming token inaccuracy, dev-auth accidentally enabled in production, and unauthorized or unexpected billable calls to the configured third-party LLM provider. The local gateway introduces three additional facts that were not present in prior phases: `GATEWAY_LLM_API_KEY` is a real billable third-party credential and must never be logged, returned in a response, or exposed to the frontend; `Ocp-Apim-Subscription-Key` is a second authentication system entirely separate from Phase 5's cookie-session authentication, and the seeded subscription IDs are sequentially numbered and therefore guessable; and employee prompt content now genuinely leaves this system for the configured third-party LLM provider, whereas no prior phase sent prompt content outside the application.
 
-**Non-negotiable rules**: no raw APIM keys ever stored; no Azure credentials sent to the browser; no subscription-key or authorization headers logged; no prompts/completions stored by default; no email addresses in metric dimensions; `DefaultAzureCredential` everywhere, managed identity preferred in Azure; every backend endpoint enforces authorization independent of frontend routing; every filter is validated against the caller's permitted scope server-side; admin changes are audit-logged; dev-login fails closed (returns 404, not a login form) whenever `AUTH_MODE != development`.
+**Non-negotiable rules**: no raw APIM keys ever stored or returned; no `GATEWAY_LLM_API_KEY`, session secret, or subscription-key header value sent to the browser or included in any success or error response; no Azure credentials sent to the browser; no subscription-key, authorization header, prompt, completion, or LLM credential logged; no prompts/completions stored by default beyond forwarding the prompt to the configured provider for a gateway request; no email addresses in metric dimensions; `DefaultAzureCredential` everywhere, managed identity preferred in Azure; every backend endpoint enforces authorization independent of frontend routing; every filter is validated against the caller's permitted scope server-side; every admin mutation, including alert acknowledgement and resolution, is audit-logged; dev-login fails closed (returns 404, not a login form) whenever `AUTH_MODE != development`.
 
 ---
 
@@ -154,6 +154,7 @@ Standard error shape: `{ "error": "<code>", "message": "<human readable>", "fiel
 
 - **Backend unit**: hierarchy logic, subscription mapping, unknown-subscription handling, budget inheritance resolution, token aggregation, cost calculation, timezone/date filtering, alert thresholds, role checks, telemetry normalization, missing/duplicate-token handling.
 - **Backend integration**: per-role access matrix (org admin / dept manager / team manager / member), cross-scope access explicitly denied, seed provider output shape, mocked Azure provider output and failure handling, reconciliation view, pagination, no credentials ever present in a response body.
+- **Local gateway**: authentication, provider failure handling, usage attribution, and budget enforcement are covered in `backend/tests/test_gateway.py`; the full review must additionally verify that gateway credentials and subscription headers never appear in success or error responses.
 - **Frontend**: each dashboard page, chart rendering, budget indicators, filters, loading/empty/partial/error states, Azure-disconnected state, role-based navigation, accessibility checks.
 - **End-to-end (seed data only)**: the 12-step flow from Section 24 of the brief, run against `TELEMETRY_SOURCE=seed`.
 - **Azure smoke tests**: the 20 checks from Section 23 of the brief — separate script suite, never run in standard PR CI, requires Neal's real environment variables.

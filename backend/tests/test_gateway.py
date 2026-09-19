@@ -156,3 +156,34 @@ def test_gateway_provider_failure_is_logged(tmp_path, monkeypatch) -> None:
         assert event.outcome == "provider_error"
         assert event.member_id == 1
         assert event.telemetry_source == "local_gateway"
+
+
+def test_gateway_credentials_and_subscription_headers_never_reach_responses(
+    tmp_path, monkeypatch
+) -> None:
+    llm_secret = "llm-secret-sentinel"
+    session_secret = "session-secret-sentinel"
+    subscription_secret = "subscription-secret-sentinel"
+    monkeypatch.setenv("GATEWAY_LLM_API_KEY", llm_secret)
+    monkeypatch.setenv("SESSION_SECRET", session_secret)
+
+    factory = client_for(tmp_path, monkeypatch, httpx.MockTransport(lambda _: httpx.Response(500)))
+    with TestClient(main.app) as client:
+        invalid_key = client.post(
+            "/gateway/v1/chat/completions",
+            headers={"Ocp-Apim-Subscription-Key": subscription_secret},
+            json={"model": "local-live", "messages": [{"role": "user", "content": "Hello"}]},
+        )
+        provider_failure = client.post(
+            "/gateway/v1/chat/completions",
+            headers={"Ocp-Apim-Subscription-Key": "northstar-sub-avery-001"},
+            json={"model": "local-live", "messages": [{"role": "user", "content": "Hello"}]},
+        )
+
+    for response in (invalid_key, provider_failure):
+        assert response.status_code in {401, 502}
+        assert llm_secret not in response.text
+        assert session_secret not in response.text
+        assert subscription_secret not in response.text
+    with factory() as session:
+        assert session.query(UsageEvent).count() == 33
