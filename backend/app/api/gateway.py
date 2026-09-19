@@ -12,6 +12,7 @@ from openai import OpenAI, RateLimitError
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from app.api.v1.budgets import resolved_policy_for_member
 from app.api.v1.common import get_db
 from app.models import Member, MemberSubscription, ModelConfiguration, UsageEvent
 
@@ -89,6 +90,12 @@ def _record_event(
     db.commit()
 
 
+def _used_tokens(db: Session, scope_type: str, scope_id: int) -> int:
+    scope_column = getattr(UsageEvent, f"{scope_type}_id")
+    events = db.query(UsageEvent.total_tokens).filter(scope_column == scope_id).all()
+    return sum(total_tokens or 0 for (total_tokens,) in events)
+
+
 @router.post("/chat/completions")
 def chat_completions(
     payload: ChatCompletionRequest,
@@ -135,6 +142,30 @@ def chat_completions(
         raise _gateway_error(
             503, "gateway_not_configured", "The local gateway model is not configured."
         )
+
+    resolved_policy = resolved_policy_for_member(db, member, datetime.now(timezone.utc))
+    if resolved_policy is not None:
+        scope_type, scope_id, policy = resolved_policy
+        if _used_tokens(db, scope_type, scope_id) >= policy.budget_amount:
+            _record_event(
+                db,
+                subscription=subscription,
+                member=member,
+                configuration=configuration,
+                request_id=request_id,
+                started_at=started_at,
+                latency_ms=round((time.perf_counter() - started_clock) * 1000),
+                outcome="quota_blocked",
+                error_code="QUOTA_EXCEEDED",
+                input_tokens=None,
+                output_tokens=None,
+                total_tokens=None,
+            )
+            raise _gateway_error(
+                403,
+                "budget_exceeded",
+                "The applicable token budget has been exceeded.",
+            )
 
     try:
         client = OpenAI(

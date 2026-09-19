@@ -183,8 +183,8 @@ access returns.
 | 6 | Dashboard frontend | All pages from Section 15 of the brief, wired to Phases 3–5's APIs | Frontend + accessibility tests | Large |
 | 7 | Alerts, audit, reconciliation | Alert computation on refresh, audit log writes, unmapped-subscription view | Unit + integration tests for alert thresholds | Medium |
 | 8 | Azure Monitor telemetry provider | Real KQL execution, DTO normalization, `DefaultAzureCredential` auth | Tests against mocked Azure responses | Large |
-| 9 | APIM policies, KQL, Bicep, scripts | `infra/policies/*.xml`, `infra/queries/*.kql`, `infra/bicep/*`, provisioning scripts — verified against current MS docs | Bicep validation, policy XML validation | Large |
-| 10 | Azure handoff docs & smoke tests | `docs/azure-handoff.md`, `infra/scripts/smoke-test.sh` and friends | Smoke tests pass against a real test APIM instance (Neal) | Medium |
+| 9 | Superseded by local-gateway budget enforcement | Azure access was lost mid-project, so local gateway enforcement replaced the planned APIM policies, KQL, and Bicep work. | Gateway budget enforcement tests | Medium |
+| 10 | Superseded by local-gateway operations | Operational documentation for the local gateway is the practical replacement for the planned Azure handoff docs and smoke tests. | Local gateway verification | Small |
 | 11 | End-to-end review & hardening | Full e2e pass, security review against Section 19's threat model, doc pass | Full test suite green, manual security checklist signed off | Medium |
 
 Each phase should become one or more GitHub issues (Section 12) sized for a single Copilot Agent task rather than implemented as one giant PR.
@@ -233,13 +233,10 @@ Grouped by phase; each is independently implementable.
 19. *Real KQL execution + DTO normalization for Azure provider*
 
 **Phase 9**
-20. *APIM policy XML, verified against current docs*
-21. *Bicep for unified model API + policy attachment*
-22. *KQL query files under source control*
+20. *Superseded: local-gateway budget enforcement replaced the planned APIM policy XML, Bicep, and KQL work after Azure access was lost mid-project.*
 
 **Phase 10**
-23. *`docs/azure-handoff.md`*
-24. *Smoke-test scripts*
+21. *Superseded: local-gateway operational documentation is the practical replacement for the planned Azure handoff docs and smoke-test scripts.*
 
 **Phase 11**
 25. *End-to-end test pass + security checklist sign-off*

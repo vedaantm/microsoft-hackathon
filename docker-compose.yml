@@ -3,6 +3,10 @@ services:
     build: ./backend
     ports:
       - "8000:8000"
+    environment:
+      GATEWAY_LLM_BASE_URL: ${GATEWAY_LLM_BASE_URL}
+      GATEWAY_LLM_API_KEY: ${GATEWAY_LLM_API_KEY}
+      GATEWAY_LLM_MODEL: ${GATEWAY_LLM_MODEL}
 
   frontend:
     build: ./frontend

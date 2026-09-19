@@ -64,7 +64,7 @@ def read(policy: BudgetPolicy) -> BudgetPolicy:
     return policy
 
 
-def resolved_policies(db: Session, as_of: datetime) -> list[tuple[str, int, BudgetPolicy]]:
+def _selected_policies(db: Session, as_of: datetime) -> dict[tuple[str, int], BudgetPolicy]:
     as_of = _sqlite_utc(as_of)
     policies = db.query(BudgetPolicy).filter(BudgetPolicy.status == "active").all()
     selected: dict[tuple[str, int], BudgetPolicy] = {}
@@ -75,34 +75,58 @@ def resolved_policies(db: Session, as_of: datetime) -> list[tuple[str, int, Budg
             key = (policy.scope_type, policy.scope_id)
             if key not in selected or policy.effective_from > selected[key].effective_from:
                 selected[key] = policy
+    return selected
 
-    def policy_for(scope_chain: list[tuple[str, int]]) -> BudgetPolicy | None:
-        for scope in reversed(scope_chain):
-            if scope in selected:
-                return selected[scope]
-        return None
+
+def _policy_for_scope_chain(
+    selected: dict[tuple[str, int], BudgetPolicy], scope_chain: list[tuple[str, int]]
+) -> tuple[str, int, BudgetPolicy] | None:
+    for scope_type, scope_id in reversed(scope_chain):
+        policy = selected.get((scope_type, scope_id))
+        if policy:
+            return scope_type, scope_id, policy
+    return None
+
+
+def resolved_policy_for_member(
+    db: Session, member: Member, as_of: datetime
+) -> tuple[str, int, BudgetPolicy] | None:
+    selected = _selected_policies(db, as_of)
+    return _policy_for_scope_chain(
+        selected,
+        [
+            ("organization", member.organization_id),
+            ("department", member.department_id),
+            ("team", member.team_id),
+            ("member", member.id),
+        ],
+    )
+
+
+def resolved_policies(db: Session, as_of: datetime) -> list[tuple[str, int, BudgetPolicy]]:
+    selected = _selected_policies(db, as_of)
 
     resolved: list[tuple[str, int, BudgetPolicy]] = []
     for organization in db.query(Organization).all():
         organization_scope = [("organization", organization.id)]
-        policy = policy_for(organization_scope)
-        if policy:
-            resolved.append(("organization", organization.id, policy))
+        resolved_policy = _policy_for_scope_chain(selected, organization_scope)
+        if resolved_policy:
+            resolved.append(("organization", organization.id, resolved_policy[2]))
         for department in db.query(Department).filter_by(organization_id=organization.id):
             department_scope = organization_scope + [("department", department.id)]
-            policy = policy_for(department_scope)
-            if policy:
-                resolved.append(("department", department.id, policy))
+            resolved_policy = _policy_for_scope_chain(selected, department_scope)
+            if resolved_policy:
+                resolved.append(("department", department.id, resolved_policy[2]))
             for team in db.query(Team).filter_by(department_id=department.id):
                 team_scope = department_scope + [("team", team.id)]
-                policy = policy_for(team_scope)
-                if policy:
-                    resolved.append(("team", team.id, policy))
+                resolved_policy = _policy_for_scope_chain(selected, team_scope)
+                if resolved_policy:
+                    resolved.append(("team", team.id, resolved_policy[2]))
                 for member in db.query(Member).filter_by(team_id=team.id):
                     member_scope = team_scope + [("member", member.id)]
-                    policy = policy_for(member_scope)
-                    if policy:
-                        resolved.append(("member", member.id, policy))
+                    resolved_policy = _policy_for_scope_chain(selected, member_scope)
+                    if resolved_policy:
+                        resolved.append(("member", member.id, resolved_policy[2]))
     return resolved
 
 

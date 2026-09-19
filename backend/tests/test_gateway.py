@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from app import main
 from app.api import gateway
 from app.api.v1.common import get_db
-from app.models import Base, UsageEvent
+from app.models import Base, BudgetPolicy, UsageEvent
 from app.telemetry import SeedTelemetryProvider
 from scripts import seed
 
@@ -20,6 +20,8 @@ def client_for(tmp_path: Path, monkeypatch, llm_transport: httpx.BaseTransport):
     factory = sessionmaker(bind=engine)
     with factory.begin() as session:
         seed.seed(session)
+        policy = session.query(BudgetPolicy).filter_by(scope_type="member", scope_id=1).one()
+        policy.budget_amount = 601
 
     def override_get_db():
         session = factory()
@@ -104,6 +106,33 @@ def test_gateway_invalid_key_returns_401(tmp_path, monkeypatch) -> None:
     assert response.json()["error"] == "invalid_subscription_key"
     with factory() as session:
         assert session.query(UsageEvent).count() == 32
+
+
+def test_gateway_blocks_member_at_token_quota_before_llm_call(tmp_path, monkeypatch) -> None:
+    factory = client_for(tmp_path, monkeypatch, httpx.MockTransport(lambda _: httpx.Response(500)))
+    with factory.begin() as session:
+        policy = session.query(BudgetPolicy).filter_by(scope_type="member", scope_id=1).one()
+        policy.budget_amount = 600
+
+    def fail_if_called(**kwargs):
+        raise AssertionError("LLM client must not be constructed for an over-quota request")
+
+    monkeypatch.setattr(gateway, "OpenAI", fail_if_called)
+    with TestClient(main.app) as client:
+        response = client.post(
+            "/gateway/v1/chat/completions",
+            headers={"Ocp-Apim-Subscription-Key": "northstar-sub-avery-001"},
+            json={"model": "local-live", "messages": [{"role": "user", "content": "Hello"}]},
+        )
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "budget_exceeded"
+    assert "token budget" in response.json()["message"]
+    with factory() as session:
+        event = session.query(UsageEvent).order_by(UsageEvent.id.desc()).first()
+        assert event is not None
+        assert event.outcome == "quota_blocked"
+        assert event.error_code == "QUOTA_EXCEEDED"
 
 
 def test_gateway_provider_failure_is_logged(tmp_path, monkeypatch) -> None:
