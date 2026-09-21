@@ -8,7 +8,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0002_phase3_subscription_metadata"
+revision = "0002_subscription_metadata"
 down_revision = "0001_phase1_schema"
 branch_labels = None
 depends_on = None

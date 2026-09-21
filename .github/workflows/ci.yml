@@ -10,6 +10,20 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: dashboard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d dashboard"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     defaults:
       run:
         working-directory: backend
@@ -24,6 +38,13 @@ jobs:
         run: python -m ruff check .
       - name: Pytest
         run: python -m pytest
+      - name: PostgreSQL migrations and seed
+        env:
+          DATABASE_URL: postgresql+psycopg://ci:ci@localhost:5432/dashboard
+          PYTHONPATH: .
+        run: |
+          alembic upgrade head
+          python scripts/seed.py
 
   frontend:
     runs-on: ubuntu-latest

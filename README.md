@@ -12,7 +12,7 @@ docker compose up --build
 
 The frontend is available at http://localhost:5173 and the backend health check is available at http://localhost:8000/api/v1/system/health.
 
-Local development uses seed-data mode by default. The local gateway is the live/demo request path for OpenAI-compatible chat completions; it forwards employee prompts to the configured third-party provider and records the returned usage in the local database. Set these three variables before using it:
+Local development uses seed-data mode by default. The local gateway is the live/demo request path for OpenAI-compatible chat completions; it forwards employee prompts to the configured third-party provider and records the returned usage in PostgreSQL. Set these three variables before using it:
 
 ```text
 GATEWAY_LLM_API_KEY=
@@ -22,9 +22,18 @@ GATEWAY_LLM_MODEL=
 
 `AzureMonitorTelemetryProvider` exists in the code as the intended Azure integration, but its queries were never completed or verified. It is not a working production telemetry path.
 
-## Database seed data
+## Database migrations and seed data
 
-From the repository root, create the local SQLite schema and load the sample fixtures with:
+`docker compose up --build` starts PostgreSQL and waits for its healthcheck before starting the backend. In a second shell, apply the full migration chain and load the sample fixtures:
+
+```powershell
+docker compose exec backend alembic upgrade head
+docker compose exec backend python scripts/seed.py
+```
+
+The default Docker database is PostgreSQL, persisted in the named `postgres-data` volume. To reset it and start from a genuinely fresh database, run `docker compose down -v` before bringing the stack up again.
+
+For fast local development outside Docker, SQLite remains supported. From the repository root, create the SQLite schema and load the sample fixtures with:
 
 ```powershell
 cd backend
@@ -41,7 +50,9 @@ alembic upgrade head
 PYTHONPATH=. python scripts/seed.py
 ```
 
-The default database is `sqlite:///./genai_dashboard.db`; set `DATABASE_URL` to use another SQLAlchemy-supported database.
+The default non-Docker database is `sqlite:///./genai_dashboard.db`; set `DATABASE_URL` to use another SQLAlchemy-supported database.
+
+The backend test suite intentionally uses temporary SQLite databases for speed and isolation. The PostgreSQL migration chain is additionally exercised against the real Compose database; the application-level budget-overlap check is tested through the API and no longer depends on a SQLite trigger.
 
 ## Phase 6 items deliberately omitted
 

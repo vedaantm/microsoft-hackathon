@@ -141,6 +141,37 @@ def test_overlapping_active_budget_returns_standard_409(phase4_client) -> None:
     assert response.json()["field_errors"] == []
 
 
+def test_budget_create_defaults_organization_and_effective_from(phase4_client) -> None:
+    client, _factory = phase4_client
+    response = client.post(
+        "/api/v1/budgets",
+        json={
+            "scope_type": "member",
+            "scope_id": 12,
+            "budget_amount": 99,
+        },
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["organization_id"] == 1
+    assert response.json()["effective_from"].endswith("Z")
+    assert response.json()["currency"] == "USD"
+    assert response.json()["status"] == "active"
+
+
+def test_overlapping_default_member_budget_returns_standard_409(phase4_client) -> None:
+    client, _factory = phase4_client
+    response = client.post(
+        "/api/v1/budgets",
+        json={"scope_type": "member", "scope_id": 1, "budget_amount": 5000},
+    )
+    assert response.status_code == 409, response.text
+    assert response.json() == {
+        "error": "budget_conflict",
+        "message": "An active budget policy already overlaps this scope and date range.",
+        "field_errors": [],
+    }
+
+
 def test_cost_estimate_uses_seed_model_price(phase4_client) -> None:
     client, _factory = phase4_client
     response = client.get("/api/v1/usage/recent?page_size=100&model=northstar-chat")

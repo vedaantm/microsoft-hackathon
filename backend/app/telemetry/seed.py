@@ -41,8 +41,8 @@ class SeedTelemetryProvider:
 
     def _events(self, filters: TelemetryFilters | None = None) -> list[UsageEvent]:
         filters = filters or TelemetryFilters()
-        date_from = self._sqlite_utc(filters.date_from)
-        date_to = self._sqlite_utc(filters.date_to)
+        date_from = self._naive_utc(filters.date_from)
+        date_to = self._naive_utc(filters.date_to)
         with self.session_factory() as session:
             query = select(UsageEvent).where(UsageEvent.member_id.is_not(None))
             if date_from:
@@ -66,7 +66,7 @@ class SeedTelemetryProvider:
         return _deduplicate_events(events)
 
     @staticmethod
-    def _sqlite_utc(value: datetime | None) -> datetime | None:
+    def _naive_utc(value: datetime | None) -> datetime | None:
         if value is None or value.tzinfo is None:
             return value
         return value.astimezone(timezone.utc).replace(tzinfo=None)
@@ -200,8 +200,8 @@ class SeedTelemetryProvider:
         self, filters: TelemetryFilters | None = None
     ) -> list[UnmappedSubscription]:
         filters = filters or TelemetryFilters()
-        date_from = self._sqlite_utc(filters.date_from)
-        date_to = self._sqlite_utc(filters.date_to)
+        date_from = self._naive_utc(filters.date_from)
+        date_to = self._naive_utc(filters.date_to)
         with self.session_factory() as session:
             query = select(UsageEvent).where(UsageEvent.member_id.is_(None))
             if date_from:

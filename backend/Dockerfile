@@ -1,12 +1,17 @@
 FROM python:3.12-slim
 
 WORKDIR /app
+ENV PYTHONPATH=/app
 
-COPY pyproject.toml .
+COPY backend/pyproject.toml .
 RUN pip install --no-cache-dir ".[dev]"
 
-COPY app ./app
-COPY tests ./tests
+COPY backend/app ./app
+COPY backend/tests ./tests
+COPY backend/alembic.ini .
+COPY backend/alembic ./alembic
+COPY backend/scripts ./scripts
+COPY sample-data ./sample-data
 
 EXPOSE 8000
 

@@ -11,21 +11,22 @@
   },
   "dependencies": {
     "@eslint/js": "latest",
+    "@tanstack/react-query": "^5.102.8",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@vitejs/plugin-react": "latest",
     "autoprefixer": "latest",
     "eslint": "latest",
-    "globals": "latest",
     "eslint-plugin-react-hooks": "latest",
     "eslint-plugin-react-refresh": "latest",
+    "globals": "latest",
     "postcss": "latest",
     "react": "latest",
     "react-dom": "latest",
+    "recharts": "^3.10.1",
     "tailwindcss": "^3.4.17",
     "typescript": "latest",
     "typescript-eslint": "latest",
     "vite": "latest"
-  },
-  "devDependencies": {}
+  }
 }

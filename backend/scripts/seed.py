@@ -22,6 +22,8 @@ from app.models import (
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ROOT / "sample-data"
+if not FIXTURES.exists():
+    FIXTURES = Path(__file__).resolve().parents[1] / "sample-data"
 
 
 def load_json(name: str):

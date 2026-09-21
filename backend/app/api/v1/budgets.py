@@ -34,18 +34,23 @@ def _error(message: str, code: str = "budget_conflict") -> HTTPException:
 
 
 def _overlaps(candidate: BudgetPolicy, existing: BudgetPolicy) -> bool:
-    candidate_end = candidate.effective_to or datetime.max
-    existing_end = existing.effective_to or datetime.max
-    return candidate.effective_from < existing_end and existing.effective_from < candidate_end
+    candidate_from = _naive_utc(candidate.effective_from)
+    candidate_end = _naive_utc(candidate.effective_to) if candidate.effective_to else datetime.max
+    existing_from = _naive_utc(existing.effective_from)
+    existing_end = _naive_utc(existing.effective_to) if existing.effective_to else datetime.max
+    return candidate_from < existing_end and existing_from < candidate_end
 
 
-def _sqlite_utc(value: datetime) -> datetime:
+def _naive_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value
     return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def ensure_valid(policy: BudgetPolicy, db: Session, exclude_id: int | None = None) -> None:
+    policy.effective_from = _naive_utc(policy.effective_from)
+    if policy.effective_to is not None:
+        policy.effective_to = _naive_utc(policy.effective_to)
     if policy.effective_to is not None and policy.effective_to <= policy.effective_from:
         raise _error("effective_to must be after effective_from.", "validation_error")
     if policy.status != "active":
@@ -65,7 +70,7 @@ def read(policy: BudgetPolicy) -> BudgetPolicy:
 
 
 def _selected_policies(db: Session, as_of: datetime) -> dict[tuple[str, int], BudgetPolicy]:
-    as_of = _sqlite_utc(as_of)
+    as_of = _naive_utc(as_of)
     policies = db.query(BudgetPolicy).filter(BudgetPolicy.status == "active").all()
     selected: dict[tuple[str, int], BudgetPolicy] = {}
     for policy in policies:
@@ -155,7 +160,9 @@ def create_budget(
     db: Session = Depends(get_db),
     identity: Identity = Depends(require_role()),
 ):
-    policy = BudgetPolicy(**payload.model_dump())
+    values = payload.model_dump()
+    values["organization_id"] = identity.organization_id
+    policy = BudgetPolicy(**values)
     ensure_budget_scope(identity, db, policy)
     ensure_valid(policy, db)
     db.add(policy)
